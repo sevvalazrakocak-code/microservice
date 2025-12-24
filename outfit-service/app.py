@@ -1,46 +1,46 @@
-from flask import Flask, jsonify, request
+from flask import Flask, render_template, request
 import requests
 
 app = Flask(__name__)
 
-# Docker içinde diğer servisin adı "weather-service" olacak (docker-compose'da tanımladığımız isim)
+# Docker ağındaki diğer servisin adresi
 WEATHER_SERVICE_URL = "http://weather-service:5001/weather"
 
-@app.route('/recommend', methods=['GET'])
-def recommend():
-    city = request.args.get('city')
-    
-    if not city:
-        return jsonify({"error": "Lutfen ?city=sehiradi seklinde sehir girin"}), 400
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    weather_data = None
+    recommendation = None
+    city = None
+    error = None
 
-    # Adım 1: Diğer servise (Microservice Communication) istek at
-    try:
-        response = requests.get(f"{WEATHER_SERVICE_URL}/{city}")
-        weather_data = response.json()
-    except:
-        return jsonify({"error": "Hava durumu servisine ulasilamadi"}), 503
+    if request.method == 'POST':
+        city = request.form.get('city')
+        
+        # 1. Hava Durumu Servisine İstek At
+        try:
+            response = requests.get(f"{WEATHER_SERVICE_URL}/{city}")
+            if response.status_code == 200:
+                weather_data = response.json()
+            else:
+                error = "Şehir bulunamadı veya servis hatası."
+        except:
+            error = "Hava durumu servisine ulaşılamıyor."
 
-    temp = weather_data.get('temp')
-    condition = weather_data.get('condition')
-    outfit = ""
+        # 2. Eğer veri geldiyse Öneri Mantığını Çalıştır
+        if weather_data:
+            temp = weather_data.get('temp')
+            condition = weather_data.get('condition')
 
-    # Adım 2: İş Mantığı (Business Logic)
-    if condition == "rainy":
-        outfit = "Şemsiyeni al ve su geçirmez bot giy."
-    elif condition == "snowy":
-        outfit = "Çok soğuk! Atkı, bere ve eldiven şart."
-    elif temp > 20:
-        outfit = "Hava harika, tişört ve güneş gözlüğü yeterli."
-    else:
-        outfit = "Hava biraz serin olabilir, yanına bir hırka al."
+            if condition == "rainy":
+                recommendation = "☔ Şemsiyeni al ve su geçirmez bot giy."
+            elif condition == "snowy":
+                recommendation = "❄️ Çok soğuk! Atkı, bere ve eldiven şart."
+            elif temp > 20:
+                recommendation = "😎 Hava harika, tişört ve güneş gözlüğü yeterli."
+            else:
+                recommendation = "🧥 Hava biraz serin olabilir, yanına bir hırka al."
 
-    # Adım 3: Sonucu Dön
-    return jsonify({
-        "city": city,
-        "weather_report": weather_data,
-        "recommendation": outfit
-    })
+    return render_template('index.html', city=city, weather=weather_data, recommendation=recommendation, error=error)
 
 if __name__ == '__main__':
-    # Bu servis 5002 portunda çalışacak
     app.run(host='0.0.0.0', port=5002)
