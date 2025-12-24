@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  # Servis A
+  weather-service:
+    build: ./weather-service
+    container_name: weather-container
+    ports:
+      - "5001:5001"
+    networks:
+      - my-microservice-network
+
+  # Servis B
+  outfit-service:
+    build: ./outfit-service
+    container_name: outfit-container
+    ports:
+      - "5002:5002"
+    depends_on:
+      - weather-service  # Servis A açılmadan B açılmasın
+    networks:
+      - my-microservice-network
+
+networks:
+  my-microservice-network:
+    driver: bridge
